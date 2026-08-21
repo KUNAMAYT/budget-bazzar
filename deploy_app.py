@@ -13,7 +13,6 @@ BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = Path(os.getenv("DATA_DIR", BASE_DIR))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 DATABASE = DATA_DIR / "budget_bazzar.db"
-API_KEY = os.getenv("BUDGET_BAZZAR_API_KEY", "dev-budget-bazzar-key")
 
 app = Flask(
     __name__,
@@ -74,17 +73,8 @@ def seed_transactions(user_id):
             )
 
 
-def authorized():
-    supplied_key = request.headers.get("X-API-Key") or request.args.get("api_key")
-    return supplied_key == API_KEY
-
-
 @app.before_request
-def require_api_key():
-    if request.path == "/api/health":
-        return None
-    if request.path.startswith("/api/") and not authorized():
-        return jsonify({"error": "Valid API key required."}), 401
+def require_login():
     if request.path.startswith("/api/transactions") and "user_id" not in session:
         return jsonify({"error": "Login required."}), 401
     return None

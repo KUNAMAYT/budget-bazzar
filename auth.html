@@ -24,7 +24,6 @@
           <div id="nameField" class="hidden"><label>Your name<input name="name" placeholder="Aarav Sharma"></label></div>
           <label>Email address<input name="email" type="email" placeholder="you@example.com" required></label>
           <label>Password<input name="password" type="password" minlength="8" placeholder="8+ characters" required></label>
-          <label>API key<input id="apiKey" name="api_key" type="password" placeholder="Your Budget Bazzar API key" required></label>
           <button class="primary-button" type="submit"><span id="submitText">Sign in</span><span>→</span></button>
           <p class="form-message" id="authMessage" role="alert"></p>
         </form>
@@ -46,9 +45,7 @@
     form.addEventListener('submit', async event => {
       event.preventDefault(); message.textContent = 'Connecting...';
       const payload = Object.fromEntries(new FormData(form).entries());
-      const apiKey = payload.api_key; delete payload.api_key;
-      sessionStorage.setItem('budgetBazzarApiKey', apiKey);
-      const response = await fetch(`/api/auth/${mode}`, { method: 'POST', headers: { 'X-API-Key': apiKey, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const response = await fetch(`/api/auth/${mode}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const data = await response.json();
       if (!response.ok) { message.textContent = data.error || 'Could not sign in.'; return; }
       window.location.href = '/';

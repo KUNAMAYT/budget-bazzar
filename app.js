@@ -1,5 +1,4 @@
-const apiKey = sessionStorage.getItem('budgetBazzarApiKey') || '';
-const headers = { 'X-API-Key': apiKey, 'Content-Type': 'application/json' };
+const headers = { 'Content-Type': 'application/json' };
 let transactions = [];
 let currentFilter = 'all';
 
@@ -79,7 +78,6 @@ document.querySelectorAll('.filter').forEach(button => button.addEventListener('
 document.querySelector('#refreshButton').addEventListener('click', loadTransactions);
 document.querySelector('#logoutButton').addEventListener('click', async () => {
   await fetch('/api/auth/logout', { method: 'POST', headers });
-  sessionStorage.removeItem('budgetBazzarApiKey');
   window.location.href = '/login';
 });
 document.querySelector('[name="transaction_date"]').value = new Date().toISOString().slice(0, 10);
