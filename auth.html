@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign in | Budget Bazzar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body class="auth-page">
+  <div class="background-slideshow" aria-hidden="true">
+    <div class="background-slide slide-one"></div>
+    <div class="background-slide slide-two"></div>
+    <div class="background-slide slide-three"></div>
+    <div class="background-slide slide-four"></div>
+  </div>
+  <main class="auth-shell">
+    <div class="auth-brand"><span class="brand-mark">B</span><span>Budget <i>Bazzar</i></span></div>
+    <section class="auth-card">
+      <div class="auth-copy"><p class="eyebrow">Your money, in focus</p><h1>Welcome<br><em>back.</em></h1><p>Keep your everyday money decisions clear, personal, and moving forward.</p></div>
+      <div class="auth-form-wrap">
+        <div class="auth-tabs"><button class="auth-tab active" data-mode="login">Sign in</button><button class="auth-tab" data-mode="register">Create account</button></div>
+        <form id="authForm">
+          <div id="nameField" class="hidden"><label>Your name<input name="name" placeholder="Aarav Sharma"></label></div>
+          <label>Email address<input name="email" type="email" placeholder="you@example.com" required></label>
+          <label>Password<input name="password" type="password" minlength="8" placeholder="8+ characters" required></label>
+          <label>API key<input id="apiKey" name="api_key" type="password" placeholder="Your Budget Bazzar API key" required></label>
+          <button class="primary-button" type="submit"><span id="submitText">Sign in</span><span>→</span></button>
+          <p class="form-message" id="authMessage" role="alert"></p>
+        </form>
+      </div>
+    </section>
+    <footer><span>Budget Bazzar</span><span>Private by design</span></footer>
+  </main>
+  <script>
+    let mode = 'login';
+    const form = document.querySelector('#authForm');
+    const message = document.querySelector('#authMessage');
+    document.querySelectorAll('.auth-tab').forEach(tab => tab.addEventListener('click', () => {
+      mode = tab.dataset.mode;
+      document.querySelector('.auth-tab.active').classList.remove('active'); tab.classList.add('active');
+      document.querySelector('#nameField').classList.toggle('hidden', mode === 'login');
+      document.querySelector('#submitText').textContent = mode === 'login' ? 'Sign in' : 'Create account';
+      document.querySelector('[name="name"]').required = mode === 'register'; message.textContent = '';
+    }));
+    form.addEventListener('submit', async event => {
+      event.preventDefault(); message.textContent = 'Connecting...';
+      const payload = Object.fromEntries(new FormData(form).entries());
+      const apiKey = payload.api_key; delete payload.api_key;
+      sessionStorage.setItem('budgetBazzarApiKey', apiKey);
+      const response = await fetch(`/api/auth/${mode}`, { method: 'POST', headers: { 'X-API-Key': apiKey, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const data = await response.json();
+      if (!response.ok) { message.textContent = data.error || 'Could not sign in.'; return; }
+      window.location.href = '/';
+    });
+  </script>
+</body>
+</html>

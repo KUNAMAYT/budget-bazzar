@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Budget Bazzar | Your money, in focus</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <div class="background-slideshow" aria-hidden="true">
+    <div class="background-slide slide-one"></div>
+    <div class="background-slide slide-two"></div>
+    <div class="background-slide slide-three"></div>
+    <div class="background-slide slide-four"></div>
+  </div>
+  <main class="shell">
+    <header class="topbar">
+      <a class="brand" href="/"><span class="brand-mark">B</span><span>Budget <i>Bazzar</i></span></a>
+      <div class="top-actions"><div class="api-status"><span class="status-dot"></span><span id="statusText">Connecting securely</span></div><button class="logout-button" id="logoutButton">Sign out</button></div>
+    </header>
+
+    <section class="intro">
+      <div><p class="eyebrow">Personal finance cockpit</p><h1>Make room for<br><em>what matters.</em></h1></div>
+      <p class="intro-copy">A clearer view of your cash flow, spending habits, and next good decision.</p>
+    </section>
+
+    <section class="summary-grid" aria-label="Financial summary">
+      <article class="summary-card balance"><span class="card-label">Available balance</span><strong id="balance">$0.00</strong><span class="card-note" id="balanceNote">Across all activity</span></article>
+      <article class="summary-card income"><span class="card-label">Money in</span><strong id="income">$0.00</strong><span class="card-note">Total income</span></article>
+      <article class="summary-card expense"><span class="card-label">Money out</span><strong id="expenses">$0.00</strong><span class="card-note">Total expenses</span></article>
+    </section>
+
+    <section class="workspace">
+      <div class="activity-panel">
+        <div class="section-heading"><div><p class="eyebrow">Ledger</p><h2>Recent activity</h2></div><button class="icon-button" id="refreshButton" title="Refresh activity" aria-label="Refresh activity">↻</button></div>
+        <div class="filter-row"><button class="filter active" data-filter="all">All</button><button class="filter" data-filter="income">Income</button><button class="filter" data-filter="expense">Expenses</button></div>
+        <div id="transactionList" class="transaction-list"><div class="empty-state">Loading your ledger...</div></div>
+      </div>
+
+      <aside class="add-panel"><p class="eyebrow">Quick add</p><h2>Log a transaction</h2><form id="transactionForm">
+        <label>Description<input name="title" placeholder="e.g. Weekly groceries" required></label>
+        <div class="form-row"><label>Amount<input name="amount" type="number" step="0.01" min="0.01" placeholder="0.00" required></label><label>Date<input name="transaction_date" type="date" required></label></div>
+        <label>Category<select name="category"><option>Food</option><option>Home</option><option>Transport</option><option>Shopping</option><option>Health</option><option>Income</option><option>Other</option></select></label>
+        <fieldset><legend>Type</legend><div class="type-options"><label><input type="radio" name="kind" value="expense" checked><span>Expense</span></label><label><input type="radio" name="kind" value="income"><span>Income</span></label></div></fieldset>
+        <button class="primary-button" type="submit">Add to ledger <span>→</span></button><p class="form-message" id="formMessage" role="status"></p>
+      </form></aside>
+    </section>
+    <footer><span>Budget Bazzar</span><span>Built for better everyday decisions</span></footer>
+  </main>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
