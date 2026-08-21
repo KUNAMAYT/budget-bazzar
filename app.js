@@ -6,6 +6,24 @@ let currentFilter = 'all';
 const money = value => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
 const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
 
+function speakWelcome() {
+  if (!('speechSynthesis' in window) || sessionStorage.getItem('welcomeSpoken') === 'true') return;
+  const speak = () => {
+    const voices = window.speechSynthesis.getVoices();
+    const preferredVoice = voices.find(voice => /female|samantha|zira|karen|susan|hazel|aria/i.test(voice.name + voice.voiceURI)) || voices.find(voice => /^en/i.test(voice.lang));
+    const message = new SpeechSynthesisUtterance('Welcome to Budget Bazzar, the most affordable store on the web.');
+    if (preferredVoice) message.voice = preferredVoice;
+    message.rate = 0.92;
+    message.pitch = 1.08;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(message);
+    sessionStorage.setItem('welcomeSpoken', 'true');
+  };
+  if (window.speechSynthesis.getVoices().length) speak();
+  else window.speechSynthesis.addEventListener('voiceschanged', speak, { once: true });
+  window.addEventListener('pointerdown', speak, { once: true });
+}
+
 async function loadTransactions() {
   const response = await fetch('/api/transactions', { headers });
   if (!response.ok) throw new Error('API key rejected');
@@ -65,4 +83,5 @@ document.querySelector('#logoutButton').addEventListener('click', async () => {
   window.location.href = '/login';
 });
 document.querySelector('[name="transaction_date"]').value = new Date().toISOString().slice(0, 10);
+speakWelcome();
 verifySession().then(ready => ready && loadTransactions()).catch(() => { document.querySelector('#statusText').textContent = 'API key required'; document.querySelector('#transactionList').innerHTML = '<div class="empty-state">Could not connect. Reload and enter a valid API key.</div>'; });
