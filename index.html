@@ -48,6 +48,13 @@
         <button class="primary-button" type="submit">Add to ledger <span>→</span></button><p class="form-message" id="formMessage" role="status"></p>
       </form></aside>
     </section>
+    <section class="games-section">
+      <div class="section-heading"><div><p class="eyebrow">Bazaar break</p><h2>Play your way to a better budget</h2></div></div>
+      <div class="games-grid">
+        <article class="game-card guess-game"><span class="game-number">01</span><p class="eyebrow">Budget Guess</p><h3>Can you spot the smart spend?</h3><p class="game-prompt" id="guessPrompt">Loading a challenge...</p><div class="guess-options" id="guessOptions"></div><p class="game-result" id="guessResult" role="status"></p></article>
+        <article class="game-card streak-game"><span class="game-number">02</span><p class="eyebrow">Savings Streak</p><h3>Build a tiny money habit</h3><p>Tap the coin each day you skip an impulse buy.</p><div class="streak-meter"><span id="streakFill"></span></div><div class="streak-row"><strong id="streakCount">0</strong><span>day streak</span><button class="coin-button" id="coinButton" title="Add a savings day" aria-label="Add a savings day">+</button></div><p class="game-result" id="streakResult" role="status">Three days unlocks a mini win.</p></article>
+      </div>
+    </section>
     <footer><span>Budget Bazzar</span><span>Built for better everyday decisions</span></footer>
   </main>
   <script src="{{ url_for('static', filename='app.js') }}"></script>

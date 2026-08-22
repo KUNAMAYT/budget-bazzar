@@ -1,6 +1,7 @@
 const headers = { 'Content-Type': 'application/json' };
 let transactions = [];
 let currentFilter = 'all';
+let savingsStreak = Number(localStorage.getItem('budgetBazzarStreak') || 0);
 
 const money = value => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
 const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
@@ -50,6 +51,38 @@ function render() {
   document.querySelectorAll('.delete-button').forEach(button => button.addEventListener('click', () => removeTransaction(button.dataset.id)));
 }
 
+const guessChallenges = [
+  { prompt: 'Which purchase keeps more money in your pocket?', options: ['$4 home coffee', '$18 delivery lunch', '$9 impulse gadget'], answer: 0 },
+  { prompt: 'Which is the best small saving?', options: ['$2.50 reusable bottle', '$12 late fee', '$7 unused subscription'], answer: 0 },
+  { prompt: 'Which choice is easiest to repeat every week?', options: ['$5 planned snack', '$25 last-minute order', '$15 random sale'], answer: 0 },
+];
+let guessRound = Math.floor(Math.random() * guessChallenges.length);
+
+function setupGames() {
+  const challenge = guessChallenges[guessRound];
+  const prompt = document.querySelector('#guessPrompt');
+  const options = document.querySelector('#guessOptions');
+  if (!prompt || !options) return;
+  prompt.textContent = challenge.prompt;
+  options.innerHTML = challenge.options.map((option, index) => `<button class="guess-option" data-choice="${index}">${escapeHtml(option)}</button>`).join('');
+  options.querySelectorAll('.guess-option').forEach(button => button.addEventListener('click', () => {
+    const correct = Number(button.dataset.choice) === challenge.answer;
+    document.querySelector('#guessResult').textContent = correct ? 'Smart pick. Your budget approves.' : 'Close one. Look for the choice you can repeat.';
+    options.querySelectorAll('.guess-option').forEach(option => option.disabled = true);
+    if (correct) button.classList.add('correct'); else button.classList.add('wrong');
+  }));
+  document.querySelector('#streakCount').textContent = savingsStreak;
+  document.querySelector('#streakFill').style.width = `${Math.min(savingsStreak, 3) / 3 * 100}%`;
+}
+
+function addSavingsDay() {
+  savingsStreak = Math.min(savingsStreak + 1, 3);
+  localStorage.setItem('budgetBazzarStreak', savingsStreak);
+  document.querySelector('#streakCount').textContent = savingsStreak;
+  document.querySelector('#streakFill').style.width = `${savingsStreak / 3 * 100}%`;
+  document.querySelector('#streakResult').textContent = savingsStreak === 3 ? 'Mini win unlocked: consistency beats intensity.' : `${3 - savingsStreak} more day${3 - savingsStreak === 1 ? '' : 's'} to unlock a mini win.`;
+}
+
 async function removeTransaction(id) {
   await fetch(`/api/transactions/${id}`, { method: 'DELETE', headers });
   await loadTransactions();
@@ -82,4 +115,6 @@ document.querySelector('#logoutButton').addEventListener('click', async () => {
 });
 document.querySelector('[name="transaction_date"]').value = new Date().toISOString().slice(0, 10);
 speakWelcome();
+setupGames();
+document.querySelector('#coinButton').addEventListener('click', addSavingsDay);
 verifySession().then(ready => ready && loadTransactions()).catch(() => { document.querySelector('#statusText').textContent = 'API key required'; document.querySelector('#transactionList').innerHTML = '<div class="empty-state">Could not connect. Reload and enter a valid API key.</div>'; });
