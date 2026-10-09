@@ -1,76 +1,100 @@
 import os
 import sqlite3
-from pathlib import Path
 from datetime import date
+from pathlib import Path
 
-from flask import Flask, jsonify, redirect, render_template, request, session, url_for
-from werkzeug.security import check_password_hash, generate_password_hash
+import psycopg
 from dotenv import load_dotenv
+from flask import Flask, jsonify, redirect, render_template, request, session, url_for
+from psycopg.rows import dict_row
+from werkzeug.security import check_password_hash, generate_password_hash
 
 load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent
-DATA_DIR = Path(os.getenv("DATA_DIR", BASE_DIR))
-DATA_DIR.mkdir(parents=True, exist_ok=True)
-DATABASE = DATA_DIR / "budget_bazzar.db"
+DATABASE_URL = os.getenv("DATABASE_URL")
+USE_POSTGRES = bool(DATABASE_URL)
 
-app = Flask(
-    __name__,
-    template_folder=str(BASE_DIR),
-    static_folder=str(BASE_DIR),
-    static_url_path="/static",
-)
-app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-change-this-secret")
+if USE_POSTGRES:
+    DATABASE = DATABASE_URL
+else:
+    DATA_DIR = Path(os.getenv("DATA_DIR", "/tmp" if os.getenv("VERCEL") else BASE_DIR))
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    DATABASE = DATA_DIR / "budget_bazzar.db"
+
+app = Flask(__name__, template_folder=str(BASE_DIR), static_folder=str(BASE_DIR), static_url_path="/static")
+app.secret_key = os.getenv("FLASK_SECRET_KEY") or (None if USE_POSTGRES else "dev-change-this-secret")
+if not app.secret_key:
+    raise RuntimeError("FLASK_SECRET_KEY must be set when DATABASE_URL is configured.")
 
 
 def get_db():
+    if USE_POSTGRES:
+        return psycopg.connect(DATABASE, row_factory=dict_row)
     connection = sqlite3.connect(DATABASE)
     connection.row_factory = sqlite3.Row
     return connection
 
 
+def execute(connection, query, parameters=()):
+    if USE_POSTGRES:
+        query = query.replace("?", "%s")
+    return connection.execute(query, parameters)
+
+
 def init_db():
     with get_db() as connection:
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS users (
+        if USE_POSTGRES:
+            execute(connection, """CREATE TABLE IF NOT EXISTS users (
+                id BIGSERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                email TEXT NOT NULL UNIQUE,
+                password_hash TEXT NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )""")
+            execute(connection, """CREATE TABLE IF NOT EXISTS transactions (
+                id BIGSERIAL PRIMARY KEY,
+                title TEXT NOT NULL,
+                category TEXT NOT NULL,
+                amount DOUBLE PRECISION NOT NULL CHECK(amount > 0),
+                kind TEXT NOT NULL CHECK(kind IN ('income', 'expense')),
+                transaction_date TEXT NOT NULL,
+                user_id BIGINT REFERENCES users(id)
+            )""")
+            execute(connection, "ALTER TABLE transactions ADD COLUMN IF NOT EXISTS user_id BIGINT REFERENCES users(id)")
+        else:
+            execute(connection, """CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
                 email TEXT NOT NULL UNIQUE,
                 password_hash TEXT NOT NULL,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )
-            """
-        )
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS transactions (
+            )""")
+            execute(connection, """CREATE TABLE IF NOT EXISTS transactions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT NOT NULL,
                 category TEXT NOT NULL,
                 amount REAL NOT NULL CHECK(amount > 0),
                 kind TEXT NOT NULL CHECK(kind IN ('income', 'expense')),
                 transaction_date TEXT NOT NULL
-            )
-            """
-        )
-        columns = {row[1] for row in connection.execute("PRAGMA table_info(transactions)")}
-        if "user_id" not in columns:
-            connection.execute("ALTER TABLE transactions ADD COLUMN user_id INTEGER REFERENCES users(id)")
+            )""")
+            columns = {row[1] for row in execute(connection, "PRAGMA table_info(transactions)")}
+            if "user_id" not in columns:
+                execute(connection, "ALTER TABLE transactions ADD COLUMN user_id INTEGER REFERENCES users(id)")
 
 
 def seed_transactions(user_id):
+    examples = [
+        ("Monthly salary", "Income", 4200, "income"),
+        ("Apartment rent", "Home", 1250, "expense"),
+        ("Grocery run", "Food", 186.45, "expense"),
+        ("Freelance project", "Income", 850, "income"),
+    ]
     with get_db() as connection:
-        if connection.execute("SELECT COUNT(*) FROM transactions WHERE user_id = ?", (user_id,)).fetchone()[0] == 0:
-            connection.executemany(
-                "INSERT INTO transactions (title, category, amount, kind, transaction_date, user_id) VALUES (?, ?, ?, ?, ?, ?)",
-                [
-                    ("Monthly salary", "Income", 4200, "income", str(date.today()), user_id),
-                    ("Apartment rent", "Home", 1250, "expense", str(date.today()), user_id),
-                    ("Grocery run", "Food", 186.45, "expense", str(date.today()), user_id),
-                    ("Freelance project", "Income", 850, "income", str(date.today()), user_id),
-                ],
-            )
+        count = execute(connection, "SELECT COUNT(*) AS count FROM transactions WHERE user_id = ?", (user_id,)).fetchone()["count"]
+        if count == 0:
+            for title, category, amount, kind in examples:
+                execute(connection, "INSERT INTO transactions (title, category, amount, kind, transaction_date, user_id) VALUES (?, ?, ?, ?, ?, ?)", (title, category, amount, kind, str(date.today()), user_id))
 
 
 @app.before_request
@@ -104,12 +128,12 @@ def register():
         return jsonify({"error": "Name, valid email, and an 8-character password are required."}), 400
     try:
         with get_db() as connection:
-            cursor = connection.execute(
-                "INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)",
-                (name, email, generate_password_hash(password)),
-            )
-            user_id = cursor.lastrowid
-    except sqlite3.IntegrityError:
+            sql = "INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)"
+            if USE_POSTGRES:
+                sql += " RETURNING id"
+            cursor = execute(connection, sql, (name, email, generate_password_hash(password)))
+            user_id = cursor.fetchone()["id"] if USE_POSTGRES else cursor.lastrowid
+    except (sqlite3.IntegrityError, psycopg.IntegrityError):
         return jsonify({"error": "An account with this email already exists."}), 409
     session["user_id"] = user_id
     session["user_name"] = name
@@ -123,7 +147,7 @@ def login():
     email = str(payload.get("email", "")).strip().lower()
     password = str(payload.get("password", ""))
     with get_db() as connection:
-        user = connection.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+        user = execute(connection, "SELECT * FROM users WHERE email = ?", (email,)).fetchone()
     if not user or not check_password_hash(user["password_hash"], password):
         return jsonify({"error": "Email or password is incorrect."}), 401
     session["user_id"] = user["id"]
@@ -148,10 +172,7 @@ def current_user():
 @app.get("/api/transactions")
 def list_transactions():
     with get_db() as connection:
-        rows = connection.execute(
-            "SELECT * FROM transactions WHERE user_id = ? ORDER BY transaction_date DESC, id DESC",
-            (session["user_id"],),
-        ).fetchall()
+        rows = execute(connection, "SELECT * FROM transactions WHERE user_id = ? ORDER BY transaction_date DESC, id DESC", (session["user_id"],)).fetchall()
     return jsonify([dict(row) for row in rows])
 
 
@@ -162,33 +183,26 @@ def add_transaction():
     category = str(payload.get("category", "Other")).strip() or "Other"
     kind = payload.get("kind")
     transaction_date = payload.get("transaction_date") or str(date.today())
-
     try:
         amount = float(payload.get("amount", 0))
     except (TypeError, ValueError):
         amount = 0
-
     if not title or kind not in {"income", "expense"} or amount <= 0:
         return jsonify({"error": "Title, type, and a positive amount are required."}), 400
-
     with get_db() as connection:
-        cursor = connection.execute(
-            "INSERT INTO transactions (title, category, amount, kind, transaction_date, user_id) VALUES (?, ?, ?, ?, ?, ?)",
-            (title, category, amount, kind, transaction_date, session["user_id"]),
-        )
-        row = connection.execute(
-            "SELECT * FROM transactions WHERE id = ? AND user_id = ?", (cursor.lastrowid, session["user_id"])
-        ).fetchone()
+        sql = "INSERT INTO transactions (title, category, amount, kind, transaction_date, user_id) VALUES (?, ?, ?, ?, ?, ?)"
+        if USE_POSTGRES:
+            sql += " RETURNING id"
+        cursor = execute(connection, sql, (title, category, amount, kind, transaction_date, session["user_id"]))
+        transaction_id = cursor.fetchone()["id"] if USE_POSTGRES else cursor.lastrowid
+        row = execute(connection, "SELECT * FROM transactions WHERE id = ? AND user_id = ?", (transaction_id, session["user_id"])).fetchone()
     return jsonify(dict(row)), 201
 
 
 @app.delete("/api/transactions/<int:transaction_id>")
 def delete_transaction(transaction_id):
     with get_db() as connection:
-        result = connection.execute(
-            "DELETE FROM transactions WHERE id = ? AND user_id = ?",
-            (transaction_id, session["user_id"]),
-        )
+        result = execute(connection, "DELETE FROM transactions WHERE id = ? AND user_id = ?", (transaction_id, session["user_id"]))
     if result.rowcount == 0:
         return jsonify({"error": "Transaction not found."}), 404
     return jsonify({"deleted": transaction_id})
