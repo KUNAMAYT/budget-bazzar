@@ -1,2 +1,13 @@
+[project]
+name = "budget-bazzar"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+  "Flask==3.1.0",
+  "psycopg[binary]>=3.2,<4",
+  "python-dotenv==1.0.1",
+  "gunicorn==23.0.0",
+]
+
 [tool.vercel]
 entrypoint = "deploy_app:app"
